@@ -1,0 +1,4 @@
+{
+  "resolvers": ["8.8.8.8"],
+  "zk": "zk://zookeeper:2181/mesos"
+}

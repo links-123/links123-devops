@@ -1,0 +1,56 @@
+version: '2'
+
+services:
+  zookeeper:
+    image: zookeeper:3.6.1
+    ports:
+      - 2181:2181
+
+  mesos-dns:
+    image: mesosphere/mesos-dns:v0.6.0
+    command: [ "/usr/bin/mesos-dns", "-v=2", "-config=/configuration.json" ]
+    volumes:
+      - ./configuration-dns.json:/configuration.json:ro
+    links:
+      - zookeeper
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+
+  mesos-leader:
+    image: mesosphere/mesos-master:1.5.0
+    ports:
+      - 5050:5050
+    environment:
+      - MESOS_HOSTNAME=$DOCKER_IP
+      - MESOS_IP=0.0.0.0
+      - MESOS_PORT=5050
+      - MESOS_LOG_DIR=/var/log/mesos
+      - MESOS_WORK_DIR=/var/tmp/mesos
+      - MESOS_ZK=zk://zookeeper:2181/mesos
+      - MESOS_QUORUM=1
+      - MESOS_REGISTRY=in_memory
+
+  mesos-agent:
+    image: mesosphere/mesos-slave:1.5.0
+    ports:
+      - 5051:5051
+    privileged: true
+    environment:
+      - MESOS_IP=0.0.0.0
+      - MESOS_PORT=5051
+      - MESOS_LOG_DIR=/var/log/mesos
+      - MESOS_WORK_DIR=/var/tmp/mesos
+      - MESOS_MASTER=zk://zookeeper:2181/mesos
+      - MESOS_SWITCH_USER=0
+      - MESOS_CONTAINERIZERS=docker,mesos
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup
+      - /var/run/docker.sock:/run/docker.sock
+    command: --resources='ports:[3000-9990,31000-32000]'
+
+  marathon:
+    image: mesosphere/marathon:v1.3.0
+    ports:
+      - 8080:8080
+    command: --master zk://zookeeper:2181/mesos --zk zk://zookeeper:2181/marathon
